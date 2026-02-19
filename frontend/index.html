@@ -1,0 +1,383 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <title>HRMS Lite</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+      font-family: 'Poppins', sans-serif;
+    }
+
+    body {
+      background: linear-gradient(135deg, #e0f7fa, #fce4ec);
+      min-height: 100vh;
+    }
+
+    .navbar {
+      background: white;
+      padding: 15px 30px;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      box-shadow: 0 5px 20px rgba(0, 0, 0, 0.05);
+    }
+
+    .logo {
+      font-weight: 600;
+      font-size: 18px;
+    }
+
+    .nav-links button {
+      background: none;
+      border: none;
+      padding: 8px 15px;
+      border-radius: 20px;
+      cursor: pointer;
+      margin-left: 10px;
+    }
+
+    .nav-links button.active {
+      background: linear-gradient(135deg, #80deea, #f48fb1);
+      color: white;
+    }
+
+    .container {
+      width: 95%;
+      max-width: 900px;
+      margin: 30px auto;
+      background: white;
+      padding: 30px;
+      border-radius: 20px;
+      box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
+    }
+
+    .hidden { display: none; }
+
+    h2 { margin-bottom: 20px; }
+
+    .form-group {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 15px;
+    }
+
+    .input-wrapper {
+      display: flex;
+      flex-direction: column;
+    }
+
+    input, select {
+      padding: 12px;
+      border-radius: 12px;
+      border: 1px solid #ddd;
+      background: #f9f9f9;
+      outline: none;
+    }
+
+    input.error, select.error {
+      border-color: #e91e63;
+      background: #fff5f7;
+    }
+
+    .error-text {
+      font-size: 12px;
+      color: #e91e63;
+      min-height: 16px;
+      margin-top: 4px;
+    }
+
+    .server-error {
+      text-align: center;
+      color: #d32f2f;
+      margin: 10px 0;
+      min-height: 20px;
+    }
+
+    .success-text {
+      text-align: center;
+      color: #4caf50;
+      margin: 10px 0;
+      min-height: 20px;
+    }
+
+    button.primary-btn {
+      width: 100%;
+      margin-top: 15px;
+      padding: 12px;
+      border-radius: 12px;
+      border: none;
+      background: linear-gradient(135deg, #80deea, #f48fb1);
+      color: white;
+      cursor: pointer;
+    }
+
+    ul {
+      list-style: none;
+      margin-top: 20px;
+    }
+
+    li {
+      padding: 12px;
+      background: #f5f5f5;
+      border-radius: 12px;
+      margin-bottom: 10px;
+    }
+
+    @media(max-width:600px) {
+      .form-group { grid-template-columns: 1fr; }
+    }
+  </style>
+</head>
+
+<body>
+
+  <div class="navbar">
+    <div class="logo">HRMS Lite</div>
+    <div class="nav-links">
+      <button id="empNav" class="active" onclick="showSection('employee')">Employee Management</button>
+      <button id="attNav" onclick="showSection('attendance')">Attendance Management</button>
+    </div>
+  </div>
+
+  <div class="container">
+
+    <!-- EMPLOYEE SECTION -->
+    <div id="employeeSection">
+      <h2>Employee Management</h2>
+
+      <div class="form-group">
+        <div class="input-wrapper">
+          <input id="empId" readonly>
+        </div>
+
+        <div class="input-wrapper">
+          <input id="name" placeholder="Full Name">
+          <div class="error-text" id="nameError"></div>
+        </div>
+
+        <div class="input-wrapper">
+          <input id="email" placeholder="Email">
+          <div class="error-text" id="emailError"></div>
+        </div>
+
+        <div class="input-wrapper">
+          <input id="dept" placeholder="Department">
+          <div class="error-text" id="deptError"></div>
+        </div>
+      </div>
+
+      <div class="server-error" id="serverError"></div>
+      <div class="success-text" id="successMsg"></div>
+
+      <button class="primary-btn" onclick="saveEmployee()">Save Employee</button>
+
+      <ul id="empList"></ul>
+    </div>
+
+    <!-- ATTENDANCE SECTION -->
+    <div id="attendanceSection" class="hidden">
+      <h2>Attendance Management</h2>
+
+      <div class="server-error" id="attError"></div>
+      <div class="success-text" id="attSuccess"></div>
+
+      <div class="form-group">
+        <select id="attEmpId">
+          <option value="">Select Employee</option>
+        </select>
+
+        <input type="date" id="attDate">
+
+        <select id="attStatus">
+          <option value="">Select Status</option>
+          <option value="Present">Present</option>
+          <option value="Absent">Absent</option>
+        </select>
+      </div>
+
+      <button class="primary-btn" onclick="addAttendance()">Mark Attendance</button>
+
+      <hr style="margin:30px 0;">
+
+      <h3>View Attendance Records</h3>
+
+      <select id="viewEmpId" onchange="loadAttendanceByEmployee()">
+        <option value="">Select Employee</option>
+      </select>
+
+      <ul id="attList"></ul>
+    </div>
+
+  </div>
+
+<script>
+const EMP_API = "http://127.0.0.1:8000/api/employees/";
+const ATT_API = "http://127.0.0.1:8000/api/attendance/";
+let editId = null;
+
+/* NAVIGATION */
+function showSection(section) {
+  employeeSection.classList.add("hidden");
+  attendanceSection.classList.add("hidden");
+  empNav.classList.remove("active");
+  attNav.classList.remove("active");
+
+  if (section === "employee") {
+    employeeSection.classList.remove("hidden");
+    empNav.classList.add("active");
+  } else {
+    attendanceSection.classList.remove("hidden");
+    attNav.classList.add("active");
+    loadAttendanceDropdowns();
+  }
+}
+
+/* EMPLOYEE ID */
+async function generateEmployeeId() {
+  const res = await fetch(EMP_API);
+  const data = await res.json();
+  if (data.length === 0) empId.value = "EMP001";
+  else {
+    const last = data[data.length - 1];
+    const num = parseInt(last.employee_id.replace(/\D/g,'')) + 1;
+    empId.value = "EMP" + num.toString().padStart(3,"0");
+  }
+}
+
+/* LOAD EMPLOYEES */
+async function loadEmployees() {
+  const res = await fetch(EMP_API);
+  const data = await res.json();
+  empList.innerHTML = "";
+  data.forEach(emp => {
+    const li = document.createElement("li");
+    li.innerHTML = `<strong>${emp.full_name}</strong> - ${emp.department}`;
+    empList.appendChild(li);
+  });
+}
+
+/* SAVE EMPLOYEE */
+async function saveEmployee() {
+  clearMessages();
+  console.log("===",{empId,name,email,dept});
+  
+  const data = {
+    employee_id: empId.value,
+    full_name: name.value.trim(),
+    email: email.value.trim(),
+    department: dept.value.trim()
+  };
+
+  const res = await fetch(EMP_API,{
+    method:"POST",
+    headers:{ "Content-Type":"application/json"},
+    body:JSON.stringify(data)
+  });
+
+  const result = await res.json();
+  if(!res.ok){ showBackendErrors(result); return; }
+
+  successMsg.innerText="Employee Saved ✓";
+  document.querySelectorAll("#employeeSection input").forEach(i=>i.value="");
+  generateEmployeeId();
+  loadEmployees();
+}
+
+/* ERROR */
+function showBackendErrors(errors){
+  nameError.innerText="";
+  emailError.innerText="";
+  deptError.innerText="";
+  attError.innerText="";
+  for(let field in errors){
+    let msg=errors[field][0];
+    if(field==="full_name") nameError.innerText=msg;
+    else if(field==="email") emailError.innerText=msg;
+    else if(field==="department") deptError.innerText=msg;
+    else attError.innerText=msg;
+  }
+}
+function clearMessages(){
+  serverError.innerText="";
+  successMsg.innerText="";
+}
+
+/* ATTENDANCE */
+async function loadAttendanceDropdowns(){
+  const res = await fetch(EMP_API);
+  const data = await res.json();
+  attEmpId.innerHTML='<option value="">Select Employee</option>';
+  viewEmpId.innerHTML='<option value="">Select Employee</option>';
+  data.forEach(emp=>{
+    const opt1=document.createElement("option");
+    opt1.value=emp.employee_id;
+    opt1.text=emp.full_name;
+    attEmpId.appendChild(opt1);
+
+    const opt2=opt1.cloneNode(true);
+    viewEmpId.appendChild(opt2);
+  });
+}
+
+async function addAttendance(){
+  attError.innerText="";
+  attSuccess.innerText="";
+
+  const data={
+    employee:attEmpId.value,
+    date:attDate.value,
+    status:attStatus.value
+  };
+
+  if(!data.employee_id || !data.date || !data.status){
+    attError.innerText="All fields are required.";
+    return;
+  }
+
+  const res=await fetch(ATT_API,{
+    method:"POST",
+    headers:{ "Content-Type":"application/json"},
+    body:JSON.stringify(data)
+  });
+
+  const result=await res.json();
+  if(!res.ok){ showBackendErrors(result); return; }
+
+  attSuccess.innerText="Attendance Marked ✓";
+  loadAttendanceByEmployee();
+}
+
+async function loadAttendanceByEmployee(){
+  const emp=viewEmpId.value;
+  attList.innerHTML="";
+  if(!emp) return;
+
+  const res=await fetch(ATT_API);
+  const data=await res.json();
+  const filtered=data.filter(r=>r.employee_id==emp);
+
+  if(filtered.length===0){
+    attList.innerHTML="<li>No Records Found</li>";
+    return;
+  }
+
+  filtered.forEach(att=>{
+    const li=document.createElement("li");
+    li.innerText=`${att.date} - ${att.status}`;
+    attList.appendChild(li);
+  });
+}
+
+/* INIT */
+loadEmployees();
+generateEmployeeId();
+</script>
+
+</body>
+</html>
